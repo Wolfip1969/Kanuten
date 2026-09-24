@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kanutenausflug Wien</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f6f4;
+    --bg-card: #ffffff;
+    --text: #161311;
+    --text-soft: #6b6560;
+    --accent: #e2001a;
+    --accent-soft: #b3040f;
+    --border: #e6e1db;
+    --tag-bg: #f1e9e7;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141212;
+      --bg-card: #1f1c1b;
+      --text: #f5f2ef;
+      --text-soft: #b0a9a3;
+      --accent: #ff3341;
+      --accent-soft: #ff6b70;
+      --border: #332c2a;
+      --tag-bg: #2a201f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141212;
+    --bg-card: #1f1c1b;
+    --text: #f5f2ef;
+    --text-soft: #b0a9a3;
+    --accent: #ff3341;
+    --accent-soft: #ff6b70;
+    --border: #332c2a;
+    --tag-bg: #2a201f;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Barlow", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.004em;
+    line-height: 1.5;
+    min-height: 100%;
+  }
+  header {
+    padding: 2rem 1.3rem 1.8rem;
+    text-align: center;
+    background: var(--accent);
+    color: #fff;
+  }
+  header .logo {
+    width: 78px;
+    height: auto;
+    margin: 0 auto 0.9rem;
+    display: block;
+  }
+  header h1 {
+    margin: 0 0 0.3rem;
+    font-family: "Barlow Condensed", "Barlow", sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    font-size: 2rem;
+    letter-spacing: -0.03em;
+    color: #fff;
+  }
+  header p {
+    margin: 0;
+    color: #ffe2e2;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+  }
+  nav.toc {
+    max-width: 640px;
+    margin: 1.2rem auto;
+    padding: 0 1rem;
+  }
+  nav.toc .day-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-soft);
+    margin: 1rem 0 0.4rem;
+  }
+  nav.toc a {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    margin-bottom: 0.35rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  nav.toc a .time {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    font-weight: bold;
+  }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0.5rem 1rem 3rem;
+  }
+  section.day {
+    margin-top: 2.2rem;
+  }
+  section.day > h2 {
+    font-family: "Barlow Condensed", "Barlow", sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    font-size: 1.4rem;
+    color: var(--accent);
+    border-bottom: 3px solid var(--text);
+    padding-bottom: 0.4rem;
+  }
+  article.stop {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem 1.1rem 1.1rem;
+    margin: 1rem 0;
+    scroll-margin-top: 1rem;
+  }
+  article.stop h3 {
+    margin: 0 0 0.15rem;
+    font-family: "Barlow", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-size: 1.08rem;
+  }
+  article.stop .meta {
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: bold;
+    margin-bottom: 0.6rem;
+  }
+  article.stop .addr {
+    font-size: 0.85rem;
+    color: var(--text-soft);
+    margin-bottom: 0.5rem;
+  }
+  article.stop p {
+    margin: 0.4rem 0;
+    font-size: 0.96rem;
+  }
+  article.stop .tag {
+    display: inline-block;
+    background: var(--tag-bg);
+    color: var(--text-soft);
+    font-size: 0.75rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    margin-top: 0.5rem;
+    margin-right: 0.3rem;
+  }
+  a.maplink {
+    display: inline-block;
+    margin-top: 0.6rem;
+    font-size: 0.85rem;
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--accent);
+  }
+  footer {
+    text-align: center;
+    color: var(--text-soft);
+    font-size: 0.8rem;
+    padding: 1.5rem 1rem 2rem;
+  }
+  .back-top {
+    display: inline-block;
+    margin-top: 1.2rem;
+    font-size: 0.85rem;
+    color: var(--text-soft);
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+
+<header id="top">
+  <svg class="logo" viewBox="0 0 200 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SVB Logo">
+    <polygon points="10,10 190,10 100,200" fill="#ffffff"/>
+    <clipPath id="triClip"><polygon points="10,10 190,10 100,200"/></clipPath>
+    <g clip-path="url(#triClip)">
+      <rect x="10" y="10" width="20" height="200" fill="#e2001a"/>
+      <rect x="50" y="10" width="20" height="200" fill="#e2001a"/>
+      <rect x="90" y="10" width="20" height="200" fill="#e2001a"/>
+      <rect x="130" y="10" width="20" height="200" fill="#e2001a"/>
+      <rect x="170" y="10" width="20" height="200" fill="#e2001a"/>
+    </g>
+    <polygon points="10,10 190,10 100,200" fill="none" stroke="#e2001a" stroke-width="6"/>
+    <rect x="18" y="18" width="164" height="34" fill="#ffffff" stroke="#e2001a" stroke-width="4"/>
+    <text x="100" y="43" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-weight="900" font-size="28" fill="#111111" letter-spacing="1">SVB</text>
+  </svg>
+  <h1>Kanutenausflug Wien</h1>
+  <p>Freitag, 25. – Sonntag, 27. September 2026</p>
+</header>
+
+<nav class="toc" aria-label="Programmübersicht">
+  <div class="day-label">Freitag, 25.9.</div>
+  <a href="#weisswurst"><span>Weißwurstfrühstück (optional)</span><span class="time">10:00</span></a>
+  <a href="#zug-rosenheim"><span>Zug Bruckmühl → Rosenheim</span><span class="time">15:00</span></a>
+  <a href="#anreise"><span>Anreise mit der Westbahn</span><span class="time">16:20</span></a>
+  <a href="#mariahilferbraeu"><span>Mariahilferbräu</span><span class="time">20:30</span></a>
+
+  <div class="day-label">Samstag, 26.9.</div>
+  <a href="#fruehstueck-sa"><span>Frühstück / Frühschoppen</span><span class="time">09:30</span></a>
+  <a href="#oldtimer"><span>Wien-Rundfahrt im Elektro-Oldtimer</span><span class="time">12:00</span></a>
+  <a href="#kaiserwiesn"><span>Wiener Kaiser Wiesn</span><span class="time">danach</span></a>
+  <a href="#bierundbierli"><span>Bier &amp; Bierli</span><span class="time">19:15</span></a>
+
+  <div class="day-label">Sonntag, 27.9.</div>
+  <a href="#fruehstueck-so"><span>Frühstück (Weingartner / Westend)</span><span class="time">09:00</span></a>
+  <a href="#sonntagsprogramm"><span>Sonntagsprogramm</span><span class="time">10:30</span></a>
+  <a href="#abreise"><span>Abreise Westbahnhof</span><span class="time">16:08</span></a>
+</nav>
+
+<main>
+
+  <section class="day" id="freitag">
+    <h2>Freitag, 25. September</h2>
+
+    <article class="stop" id="weisswurst">
+      <h3>🥨 Weißwurstfrühstück (optional)</h3>
+      <div class="meta">10:00 Uhr, Marktküche Bruckmühl</div>
+      <p>Klassisches bayerisches Weißwurstfrühstück: Kalbswürste mit dünner Haut, dazu Brezn, süßer Senf und traditionell ein Weißbier – die Wurst wird gekocht (nicht gebraten) und vor dem Essen ausgezuzelt bzw. gehäutet. Wer mag, startet den Ausflugstag also standesgemäß zünftig, bevor es Richtung Rosenheim losgeht.</p>
+      <span class="tag">optional, nicht Teil der Kernagenda</span>
+    </article>
+
+    <article class="stop" id="zug-rosenheim">
+      <h3>🚉 Zug Bruckmühl → Rosenheim</h3>
+      <div class="meta">Abfahrt 15:00 Uhr, Bahnhof Bruckmühl</div>
+      <p>Bruckmühl liegt an der Mangfalltalbahn (München–Holzkirchen–Bad Aibling–Bruckmühl–Rosenheim), die von der Bayerischen Regiobahn (BRB, früher "Meridian") bedient wird. Die Fahrzeit nach Rosenheim beträgt normalerweise nur ca. 15–20 Minuten, die Strecke wird werktags und am Wochenende recht dicht getaktet (im Schnitt alle 30–60 Minuten). Ein Zug um 15:00 Uhr ist auf dieser Linie also plausibel.</p>
+      <p><strong>Zur Verifizierung:</strong> Ich konnte die exakte Minute für den 25.9.2026 nicht live aus dem Fahrplan bestätigen – bitte kurz vorher nochmal in der DB-Navigator-App oder auf bahn.de gegenchecken, ob die 15:00-Verbindung tatsächlich so fährt (und ob genug Zeit bis zur Westbahn-Abfahrt um 16:20 in Wien bzw. dem Umstieg in Rosenheim bleibt).</p>
+      <a class="maplink" href="https://www.google.com/maps/search/?api=1&query=Bahnhof+Bruckm%C3%BChl" target="_blank" rel="noopener">📍 Bahnhof Bruckmühl in Google Maps</a>
+    </article>
+
+    <article class="stop" id="anreise">
+      <h3>🚆 Abfahrt mit der Westbahn</h3>
+      <div class="meta">16:20 Uhr Rosenheim → 19:52 Uhr Wien</div>
+      <p>Die Westbahn ist der private Konkurrent zu den ÖBB auf der Strecke München–Salzburg–Wien und fährt auch über Rosenheim. Bekannt für vergleichsweise günstige Tickets, kostenloses WLAN und ein Bordbistro. Ankunft in Wien ist üblicherweise am Hauptbahnhof – rechtzeitig checken, ob es an dem Tag Anschluss- oder Ersatzverkehr gibt.</p>
+      <span class="tag">Zugfahrt ca. 3,5 Std.</span>
+    </article>
+
+    <article class="stop" id="mariahilferbraeu">
+      <h3>🍻 Mariahilferbräu</h3>
+      <div class="meta">Reservierung 20:30 Uhr</div>
+      <div class="addr">Mariahilfer Straße 152, 1150 Wien</div>
+      <p>Traditionelles Wiener Wirtshaus mit Gastro-Geschichte seit 1870, Bedienung in Tracht. Auf der Karte: Wiener Schnitzel, Gulasch, Apfelstrudel, dazu auch vegane/vegetarische Optionen. Neun Biere vom Fass inklusive monatlich wechselndem Saisonbier. Wurde als "Lieblingswirt Wien 1150" (2023–2025) und "Bierwirt des Jahres 2025" ausgezeichnet – für eine größere Gruppe (bis 150 Personen) gut geeignet.</p>
+      <a class="maplink" href="https://www.google.com/maps/search/?api=1&query=Mariahilfer+Stra%C3%9Fe+152%2C+1150+Wien" target="_blank" rel="noopener">📍 In Google Maps öffnen</a>
+    </article>
+  </section>
+
+  <section class="day" id="samstag">
+    <h2>Samstag, 26. September</h2>
+
+    <article class="stop" id="fruehstueck-sa">
+      <h3>☕ Frühstück / eventuell kleiner Frühschoppen</h3>
+      <div class="meta">09:30 Uhr</div>
+      <p>Entscheidung vor Ort – je nachdem wie die Nacht war.</p>
+    </article>
+
+    <article class="stop" id="oldtimer">
+      <h3>🚗 Wien-Rundfahrt im Elektro-Oldtimer</h3>
+      <div class="meta">Abfahrt 12:00 Uhr, Herrengasse 12</div>
+      <div class="addr">Treffpunkt vor dem Radisson Blu Style Hotel, Herrengasse 12, 1010 Wien</div>
+      <p>Ein originalgetreu nachgebauter Elektro-Oldtimer (Platz für bis zu 5 Personen) fährt mit privatem Fahrer durch die Innere Stadt. Die Route führt unter anderem an Hofburg, Volksgarten, Burgtheater, Rathaus und Teilen der Ringstraße vorbei, während der Fahrer Geschichten zur Wiener Geschichte erzählt. Emissionsfrei, leise und wetterfest – auch bei Regen kein Problem. Die Standardtour dauert meist 40–90 Minuten, je nach gebuchtem Paket.</p>
+      <a class="maplink" href="https://www.google.com/maps/search/?api=1&query=Herrengasse+12%2C+1010+Wien" target="_blank" rel="noopener">📍 In Google Maps öffnen</a>
+    </article>
+
+    <article class="stop" id="kaiserwiesn">
+      <h3>🎪 Wiener Kaiser Wiesn</h3>
+      <div class="meta">Prater, Kaiserwiese – Österreichs größtes Oktoberfest</div>
+      <p>Die Kaiser Wiesn (bis vor Kurzem "Wiener Wiesn") findet 2026 bereits zum fünften Mal statt, heuer vom 24. September bis 11. Oktober auf der Kaiserwiese im Prater. Drei große Festzelte – Gösser-, Wiesbauer- und Nordic-Spirit-Kaiserzelt – plus fünf Almen und ein Wiesn-Dorf sorgen für Programm. Tagsüber ist der Eintritt aufs Festgelände frei, Tickets braucht man nur für die Abendveranstaltungen in den Zelten (Mi–Sa, 11:30 bis Mitternacht geöffnet). Livebands, Schmankerl und waschechtes Wiesn-Flair – Tracht ist hier Pflichtprogramm.</p>
+      <span class="tag">täglich ab 12 Uhr, freier Eintritt tagsüber</span>
+    </article>
+
+    <article class="stop" id="bierundbierli">
+      <h3>🍽️ Bier &amp; Bierli</h3>
+      <div class="meta">Reservierung 19:15 Uhr</div>
+      <div class="addr">Operngasse 12, 1010 Wien</div>
+      <p>Lokal mit lockerer, "vintage" Atmosphäre nahe der Wiener Staatsoper – Wände dekoriert mit gesammelten Bierdosen und Bierdeckeln. Küche mischt österreichische Klassiker (Wiener Schnitzel, Wiener Gulasch, Zwiebelrostbraten, Käsespätzle) mit internationalen Gerichten wie Burgern und Pastrami-Sandwiches. Große Bierauswahl vom Fass und aus der Flasche, freundlicher Service wird durchgehend gelobt.</p>
+      <a class="maplink" href="https://www.google.com/maps/search/?api=1&query=Operngasse+12%2C+1010+Wien" target="_blank" rel="noopener">📍 In Google Maps öffnen</a>
+    </article>
+
+    <article class="stop">
+      <h3>🌙 Abendprogramm</h3>
+      <div class="meta">individuell, nach dem Essen</div>
+      <p>Keine feste Planung – jeder wie er mag.</p>
+    </article>
+  </section>
+
+  <section class="day" id="sonntag">
+    <h2>Sonntag, 27. September</h2>
+
+    <article class="stop" id="fruehstueck-so">
+      <h3>☕ Frühstück</h3>
+      <div class="meta">09:00 Uhr – Café Weingartner oder Café Westend</div>
+      <p><strong>Café Weingartner</strong> (Goldschlagstraße 6, 1150 Wien): klassisches Wiener Kaffeehaus nahe dem Westbahnhof, seit 1874. Frühstücksangebot von Buttersemmel bis Großem Frühstück (mit Ei, Schinken, Käse), dazu Billardraum, Zeitungsarchiv und ein Gastgarten für 45 Personen.</p>
+      <p><strong>Café Westend</strong> (Mariahilfer Straße 128, 1070 Wien): traditionsreiches Kaffeehaus direkt gegenüber dem Westbahnhof, seit über 125 Jahren Institution im Grätzel, 2023 unter neuer Führung sanft renoviert. Ganztägig Frühstück, dazu Klassiker wie Kalbsschnitzel und Eiernockerl, gelegentlich Live-Klavier.</p>
+      <span class="tag">beide fußläufig zum Westbahnhof</span>
+    </article>
+
+    <article class="stop" id="sonntagsprogramm">
+      <h3>🎲 Sonntagsprogramm (Ansage 1 Woche vorher)</h3>
+      <div class="meta">ab ca. 10:30 Uhr – je nach Wetter/Wasserstand</div>
+      <p><strong>Schloss Schönbrunn (Garten):</strong> Der weitläufige Schlosspark der ehemaligen kaiserlichen Sommerresidenz ist frei zugänglich (nur das Schloss selbst und einzelne Attraktionen wie die Gloriette kosten Eintritt). Barocke Gartenanlage mit Broderiegarten, Irrgarten und Blick auf die Gloriette – ideal für einen ausgedehnten Spaziergang.</p>
+      <p><strong>Fahrt auf der Donau:</strong> Schifffahrten auf der Donau bzw. dem Donaukanal führen meist an der historischen Innenstadt, dem Donauturm und modernen Vierteln wie der Donau City vorbei – eine entspannte Alternative bei gutem Wetter.</p>
+      <p><strong>Minigolf vor dem MuseumsQuartier ("MQ Amore"):</strong> Bespielbarer Skulpturenpark direkt vor dem MQ, 12 Bahnen, gestaltet von Künstlern und Architekten rund um Daniel Sanwald – jede Bahn ein kleines Kunstwerk. Saison meist März bis Oktober, Öffnungszeiten Mo–Fr 12–22 Uhr, Sa/So/Feiertag 10–22 Uhr, Preis ca. 7 € pro Erwachsenem. Kiosk mit Snacks und Getränken vor Ort.</p>
+      <p><strong>Hofburg:</strong> Die ehemalige Residenz der Habsburger im Zentrum Wiens, heute u.a. Amtssitz des Bundespräsidenten. Beherbergt Sisi-Museum, Kaiserappartements und die Schatzkammer – auch ein Spaziergang durch die Höfe und am Volksgarten vorbei lohnt sich ohne Ticket.</p>
+      <span class="tag">Programm wird kurzfristig bekanntgegeben</span>
+    </article>
+
+    <article class="stop" id="abreise">
+      <h3>🚆 Abreise</h3>
+      <div class="meta">16:08 Uhr Wien Westbahnhof → 19:39 Uhr Rosenheim</div>
+      <p>Rückfahrt mit der Bahn ab Wien Westbahnhof – rechtzeitig da sein, gerade am Wochenende während der Kaiser-Wiesn-Zeit kann es in der Stadt und am Bahnhof voller sein als sonst.</p>
+    </article>
+  </section>
+
+  <p style="text-align:center;"><a class="back-top" href="#top">↑ nach oben</a></p>
+</main>
+
+<footer>
+  Programm &amp; Hintergrundinfos für den Kanutenausflug Wien · 25.–27. September 2026
+</footer>
+
+</body>
+</html>
