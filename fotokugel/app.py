@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
-"""Lokale Weboberfläche für fotokugel.py.  Start:  python app.py  (öffnet den Browser)"""
+"""Weboberfläche für fotokugel.py.  Start:  python app.py  (öffnet den Browser, im WLAN per QR-Code erreichbar)
+
+    python app.py --nur-lokal   nur auf diesem Rechner erreichbar
+"""
+import argparse
 import json
+import secrets
+import socket
 import os
 import re
 import shutil
@@ -13,7 +19,7 @@ import uuid
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, quote, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
 from PIL import Image, ImageOps
 
@@ -30,6 +36,8 @@ PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff
 AUDIO_EXTS = {".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac"}
 JOBS = {}            # projekt-id -> {"proc", "log", "mode", "started", "done", "ok", "out"}
 LOCK = threading.Lock()
+TOKEN = secrets.token_urlsafe(9)      # geheimer Schlüssel für Zugriffe aus dem WLAN
+LAN_URL = None
 
 
 def safe_name(name):
@@ -163,13 +171,46 @@ class Handler(SimpleHTTPRequestHandler):
                     return
                 left -= len(chunk)
 
+    def is_local(self):
+        return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
+    def authorized(self, q):
+        """Vom Rechner selbst immer, aus dem WLAN nur mit dem Schlüssel aus dem QR-Code."""
+        if self.is_local():
+            return True
+        cookie = self.headers.get("Cookie", "")
+        return f"fk={TOKEN}" in cookie or q.get("k") == TOKEN
+
+    def deny(self):
+        body = ("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>"
+                "<body style='font:17px -apple-system,sans-serif;padding:32px;max-width:28em'>"
+                "<h2>Kein Zugriff</h2><p>Bitte den QR-Code am Rechner scannen. Der Link ändert sich bei jedem Start "
+                "der Fotokugel.</p></body>").encode()
+        self.send_response(403)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     # ---------------------------------------------------------------- GET
     def do_GET(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if not self.authorized(q):
+            return self.deny()
         try:
             if u.path in ("/", "/index.html"):
+                if q.get("k") == TOKEN:                     # Schlüssel als Cookie merken, sauberer Link
+                    self.send_response(303)
+                    self.send_header("Set-Cookie", f"fk={TOKEN}; Path=/; Max-Age=2592000; SameSite=Strict")
+                    self.send_header("Location", "/")
+                    self.end_headers()
+                    return
                 return self.send_file(HERE / "ui.html")
+            if u.path == "/lib/qrcode.js":
+                return self.send_file(HERE / "node_modules" / "qrcode-generator" / "qrcode.js", "text/javascript")
+            if u.path == "/api/info":
+                return self.send_json({"lanUrl": LAN_URL if self.is_local() else None, "lokal": self.is_local()})
             if u.path == "/api/projekt":
                 d = project_dir(q.get("id"))
                 s = load_settings(d)
@@ -216,6 +257,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if not self.authorized(q):
+            return self.deny()
         try:
             if u.path == "/api/neu":
                 pid = uuid.uuid4().hex[:8]
@@ -307,6 +350,8 @@ class Handler(SimpleHTTPRequestHandler):
                 cmd += ["--musik", str(music), "--musik-start", str(float(s.get("musikStart", 0)))]
             if mode == "standbilder":
                 cmd.append("--standbilder")
+            if sys.platform == "darwin" and shutil.which("caffeinate"):
+                cmd = ["caffeinate", "-i", "-s"] + cmd           # Mac schläft beim Rendern nicht ein
             proc = subprocess.Popen(cmd, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
                                        else {"start_new_session": True}))
@@ -315,16 +360,35 @@ class Handler(SimpleHTTPRequestHandler):
         return self.send_json({"ok": True})
 
 
+def lan_ip():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.168.0.1", 9))                  # sendet nichts, ermittelt nur die eigene Adresse
+            ip = s.getsockname()[0]
+        return None if ip.startswith("127.") else ip
+    except OSError:
+        return None
+
+
 def main():
+    global LAN_URL
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--nur-lokal", action="store_true", help="nicht im WLAN freigeben")
+    args = ap.parse_args()
     PROJECTS.mkdir(exist_ok=True)
     missing = [n for n in ("ffmpeg", "node") if not shutil.which(n)]
     if missing:
         print("Achtung, nicht gefunden:", ", ".join(missing), "(siehe README)")
     if not (HERE / "node_modules" / "three").exists():
         print("Achtung: im Ordner fotokugel einmal  npm install  ausführen")
-    httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    httpd = ThreadingHTTPServer(("127.0.0.1" if args.nur_lokal else "0.0.0.0", PORT), Handler)
     url = f"http://127.0.0.1:{PORT}/"
     print(f"Fotokugel läuft auf {url}  (Beenden mit Strg+C)")
+    ip = None if args.nur_lokal else lan_ip()
+    if ip:
+        LAN_URL = f"http://{ip}:{PORT}/?{urlencode({'k': TOKEN})}"
+        print(f"Am iPhone (gleiches WLAN): {LAN_URL}")
+        print("  oder einfach den QR-Code in der Oberfläche scannen.")
     if not os.environ.get("FOTOKUGEL_KEIN_BROWSER"):
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:

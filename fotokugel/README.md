@@ -12,11 +12,13 @@ Gleiche Fotos liegen nie direkt nebeneinander, auch nicht über die Naht der Kug
 
 Du brauchst **Python 3.9+**, **Node.js 18+** und **ffmpeg**.
 
-**Mac** (mit [Homebrew](https://brew.sh)):
+**Mac**: Zuerst [Homebrew](https://brew.sh) installieren. Dazu im Terminal den Befehl von der Homebrew-Startseite einfügen. Dann:
 
 ```bash
 brew install python node ffmpeg
 ```
+
+Den Ordner `fotokugel` auf den Mac holen, zum Beispiel über GitHub mit „Code“ → „Download ZIP“ und dann entpacken. Im Terminal mit `cd` in den Ordner wechseln, am einfachsten `cd ` tippen und den Ordner ins Terminalfenster ziehen.
 
 **Windows**: Python von python.org, Node.js von nodejs.org und ffmpeg mit `winget install ffmpeg` installieren.
 
@@ -25,7 +27,7 @@ Danach im Ordner `fotokugel`:
 ```bash
 npm install
 npx playwright install chromium
-pip install pillow numpy "opencv-python-headless<5"
+pip3 install pillow numpy "opencv-python-headless<5"
 ```
 
 `opencv` ist optional. Damit werden die Kacheln so zugeschnitten, dass das Gesicht drin ist. Für iPhone-HEIC-Fotos zusätzlich `pip install pillow-heif`.
@@ -41,7 +43,21 @@ Doppelklick auf **`Fotokugel starten.command`** (Mac) oder **`Fotokugel starten.
 
 Fotos, Musik und Ergebnisse liegen im Unterordner `projekte/` und bleiben auch nach einem Neustart erhalten. Mit „Neues Projekt“ beginnst du von vorn.
 
-Die Oberfläche läuft nur auf deinem Rechner (`127.0.0.1`). Nichts wird ins Internet hochgeladen.
+### Vom iPhone aus bedienen
+
+Der Mac rechnet, das iPhone ist die Fernbedienung.
+
+1. Fotokugel am Mac starten (Doppelklick auf `Fotokugel starten.command`).
+2. Oben rechts auf **Am iPhone öffnen** klicken. Es erscheint ein QR-Code.
+3. QR-Code mit der iPhone-Kamera scannen. iPhone und Mac müssen im selben WLAN sein.
+4. Am iPhone Fotos aus der Mediathek wählen, Endbild antippen, Video erstellen.
+5. **Video herunterladen** antippen. Das Video landet in der App **Dateien** unter Downloads. Dort antippen, dann **Teilen** und **Video sichern**. Danach ist es in Fotos und kann zu Instagram oder CapCut.
+
+Beim ersten Start fragt macOS eventuell, ob Python eingehende Verbindungen annehmen darf. Bitte **Erlauben** wählen, sonst erreicht das iPhone den Mac nicht. Während des Renderns schläft der Mac nicht ein, der Bildschirm darf aber ausgehen.
+
+Musik am iPhone: Wählbar sind nur Dateien aus der App Dateien, zum Beispiel heruntergeladene MP3s. Songs aus Apple Music gehen nicht.
+
+**Sicherheit:** Der Link im QR-Code enthält einen geheimen Schlüssel, der sich bei jedem Start ändert. Ohne ihn bekommt niemand im WLAN Zugriff. Hochgeladen wird nur auf deinen Mac, nichts ins Internet. Mit `python app.py --nur-lokal` ist die Oberfläche nur am Mac selbst erreichbar.
 
 ## Benutzen im Terminal
 

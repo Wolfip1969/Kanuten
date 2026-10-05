@@ -4,6 +4,7 @@
   "description": "Fotos werden zur Videowand und dann zur rotierenden Kugel",
   "dependencies": {
     "playwright": "1.56.1",
+    "qrcode-generator": "^1.4.4",
     "three": "0.170.0"
   }
 }
