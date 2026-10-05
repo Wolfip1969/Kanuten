@@ -1,0 +1,218 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
+<body>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+
+// Job-Konfiguration kommt von fotokugel.py (?job=/.arbeit/<name>/)
+const JOB = new URLSearchParams(location.search).get('job');
+const cfg = await (await fetch(JOB + 'job.json')).json();
+const W = cfg.width, H = cfg.height, SS = cfg.supersample;
+const COLS = cfg.cols, ROWS = cfg.rows, GRID = cfg.grid;
+const END = cfg.end;
+const K = cfg.duration / 25;              // Zeitachse ist auf 25 s entworfen und wird skaliert
+
+const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(1);
+renderer.setSize(W * SS, H * SS);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(cfg.background);
+const FOV = 35, TV = Math.tan(THREE.MathUtils.degToRad(FOV / 2)), ASPECT = W / H;
+const camera = new THREE.PerspectiveCamera(FOV, ASPECT, 0.05, 400);
+scene.add(new THREE.AmbientLight(0xffffff, 2.2));
+const key = new THREE.DirectionalLight(0xffffff, 1.4);
+key.position.set(-4, 5, 10);
+scene.add(key);
+
+// --- Texturen --------------------------------------------------------------
+const loader = new THREE.TextureLoader();
+const texCache = {};
+function tex(url) {
+  if (!texCache[url]) {
+    texCache[url] = new Promise((res, rej) => loader.load(JOB + url, t => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      res(t);
+    }, undefined, rej));
+  }
+  return texCache[url];
+}
+
+// --- Geometrie --------------------------------------------------------------
+const P = 1.08;                          // Raster-Abstand (Kachel 1.0 + Fuge)
+const RC = COLS * P / (2 * Math.PI);     // Zylinder-/Kugelradius
+const DPHI = THREE.MathUtils.degToRad(136 / (ROWS - 1));   // Reihen über ±68° Breite
+const plane = new THREE.PlaneGeometry(1, 1);
+
+const group = new THREE.Group();
+scene.add(group);
+
+// Innenkugel: füllt die Lücken zwischen den Kacheln (sonst sieht man die Rückseite)
+const coreMat = new THREE.MeshLambertMaterial({color: new THREE.Color(cfg.gapColor), transparent: true, opacity: 0});
+const core = new THREE.Mesh(new THREE.SphereGeometry(RC * 0.985, 128, 80), coreMat);
+group.add(core);
+
+let seed = cfg.seed || 12345;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+const tiles = [];
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+  const n = GRID[r][c];
+  const pivot = new THREE.Object3D();
+  const front = new THREE.Mesh(plane, new THREE.MeshLambertMaterial({color: 0xffffff}));
+  pivot.add(front);
+  let back = null;
+  // SW-Modus: Schachbrett Farbe/SW, das Gegenstück liegt deckungsgleich davor und wird eingeblendet
+  const isEnd = r === END.r && c === END.c;
+  const color = !cfg.bw || (r + c) % 2 === 0;
+  const frontUrl = isEnd ? cfg.endTile : (color ? cfg.tiles[n] : cfg.tilesBw[n]);
+  tex(frontUrl).then(t => { front.material.map = t; front.material.needsUpdate = true; });
+  if (cfg.bw) {
+    back = new THREE.Mesh(plane, new THREE.MeshLambertMaterial({color: 0xffffff, transparent: true, opacity: 0}));
+    back.position.z = 0.003;
+    pivot.add(back);
+    tex(color ? cfg.tilesBw[n] : cfg.tiles[n]).then(t => { back.material.map = t; back.material.needsUpdate = true; });
+  }
+  group.add(pivot);
+  const x = (c - (COLS - 1) / 2) * P;
+  const y = ((ROWS - 1) / 2 - r) * P;
+  const theta = x / RC;
+  const phi = ((ROWS - 1) / 2 - r) * DPHI;
+  const sScale = Math.min(P * Math.cos(phi), RC * DPHI) * 0.93;
+  tiles.push({r, c, pivot, front, back, x, y, theta, phi, sScale, pop: Math.floor(rnd() * 7) * 0.25 * K});
+}
+const TILE_END = tiles.find(t => t.r === END.r && t.c === END.c);
+
+// Endbild als Vollbild-Ebene vor der Kamera, wird am Schluss eingeblendet
+const endMat = new THREE.MeshBasicMaterial({transparent: true, opacity: 0, depthTest: false, depthWrite: false});
+tex(cfg.endFrame).then(t => { endMat.map = t; endMat.needsUpdate = true; });
+const endPlane = new THREE.Mesh(plane, endMat);
+endPlane.renderOrder = 999;
+camera.add(endPlane);
+scene.add(camera);
+{ const d = 1; endPlane.position.set(0, 0, -d); endPlane.scale.set(2 * d * TV * ASPECT, 2 * d * TV, 1); }
+
+// --- Zeitachse (in Sekunden bei 25 s Gesamtlänge, wird mit K skaliert) -----
+const clamp01 = v => Math.min(1, Math.max(0, v));
+const smooth = v => { v = clamp01(v); return v * v * (3 - 2 * v); };
+const smoother = v => { v = clamp01(v); return v * v * v * (v * (v * 6 - 15) + 10); };
+const lerp = (a, b, t) => a + (b - a) * t;
+const T = s => s * K;
+
+const T_BEND = [T(5), T(7)], T_SPHERE = [T(7), T(9)], T_SPIN = [T(8), T(21.5)], T_FLY = [T(21.5), T(23.6)];
+const WAVES = [11, 13.5, 16, 18.5].map(T);   // gerade Anzahl -> Endzustand wie Anfang
+const SPIN_TOTAL = -TILE_END.theta + 2 * 2 * Math.PI;
+
+function spinAngle(t) {
+  const [a, b] = T_SPIN;
+  const u = clamp01((t - a) / (b - a));
+  const prof = s => {           // Integral eines Trapez-Geschwindigkeitsprofils
+    const r1 = 0.15, r2 = 0.35;
+    if (s < r1) return (s * s) / (2 * r1);
+    if (s < 1 - r2) return r1 / 2 + (s - r1);
+    const d = s - (1 - r2);
+    return r1 / 2 + (1 - r2 - r1) + d - (d * d) / (2 * r2);
+  };
+  return SPIN_TOTAL * prof(u) / prof(1);
+}
+
+const q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(), m4 = new THREE.Matrix4();
+const nrm = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), ORIGIN = new THREE.Vector3();
+function quatFromNormal(n, out) {
+  m4.lookAt(ORIGIN, n.clone().negate(), UP);
+  return out.setFromRotationMatrix(m4);
+}
+
+function layout(t) {
+  const uB = smoother((t - T_BEND[0]) / (T_BEND[1] - T_BEND[0]));
+  const uS = smoother((t - T_SPHERE[0]) / (T_SPHERE[1] - T_SPHERE[0]));
+  const rho = 1 / Math.max(1e-4, uB / RC);
+  for (const Ti of tiles) {
+    const a = Ti.x / rho;                                  // Wand -> Zylinder (Biegen)
+    let px = rho * Math.sin(a), pz = RC - rho + rho * Math.cos(a), py = Ti.y;
+    nrm.set(Math.sin(a), 0, Math.cos(a));
+    let scale = 1;
+    if (uS > 0) {                                          // Zylinder -> Kugel
+      const rad = lerp(RC, RC * Math.cos(Ti.phi), uS);
+      py = lerp(Ti.y, RC * Math.sin(Ti.phi), uS);
+      px = rad * Math.sin(Ti.theta); pz = rad * Math.cos(Ti.theta);
+      quatFromNormal(new THREE.Vector3(Math.sin(Ti.theta), 0, Math.cos(Ti.theta)), q0);
+      quatFromNormal(new THREE.Vector3(Math.cos(Ti.phi) * Math.sin(Ti.theta), Math.sin(Ti.phi), Math.cos(Ti.phi) * Math.cos(Ti.theta)), q1);
+      Ti.pivot.quaternion.slerpQuaternions(q0, q1, uS);
+      scale = lerp(1, Ti.sScale, uS);
+    } else {
+      quatFromNormal(nrm, Ti.pivot.quaternion);
+    }
+    Ti.pivot.position.set(px, py, pz);
+    const pop = smooth((t - Ti.pop) / (0.35 * K));         // Intro: Kacheln ploppen auf
+    Ti.pivot.scale.setScalar(Math.max(1e-4, scale * pop * (1 + 0.12 * Math.sin(Math.PI * pop))));
+    if (Ti.back) {                                         // Farb-Wellen (nur SW-Modus)
+      let f = 0;
+      for (const w of WAVES) f += smooth((t - w - ((Ti.c / COLS) * 1.2 + Ti.r * 0.04) * K) / (0.6 * K));
+      const blend = f % 2 <= 1 ? f % 2 : 2 - f % 2;
+      Ti.back.material.opacity = blend;
+      Ti.back.visible = blend > 0.001;
+    }
+  }
+  coreMat.opacity = smooth((uS - 0.55) / 0.45);
+  core.visible = coreMat.opacity > 0.001;
+  coreMat.transparent = coreMat.opacity < 1;
+  group.rotation.y = spinAngle(t);
+  group.rotation.x = 0.28 * Math.sin(Math.PI * clamp01((t - T(8.5)) / T(13)));
+}
+
+// Kamera-Abstände je nach Bildformat
+const fitW = w => w / (2 * TV * ASPECT), fitH = h => h / (2 * TV);
+const WALL_W = COLS * P, WALL_H = ROWS * P;
+const D_WALL = ASPECT >= WALL_W / WALL_H ? fitH(WALL_H * 1.06) : (ASPECT >= 1 ? fitW(WALL_W * 1.04) : fitH(WALL_H * 1.2));
+const VIS_W = 2 * D_WALL * TV * ASPECT;
+const PAN = Math.max(0, (WALL_W - VIS_W) / 2);          // Hochformat: Schwenk über die Wand
+const D_START = Math.max(fitH(WALL_H * 0.4), 3);
+const D_SPHERE = Math.max(fitW(2 * RC * 1.12), fitH(2 * RC * 1.3));   // Kugel füllt im Hochformat fast die Breite
+const D_FILL = (TILE_END.sScale / 2) / (TV * Math.max(ASPECT, 1));   // End-Kachel deckt das Bild
+
+function cameraAt(t) {
+  let d, x = 0, y = 0;
+  if (t < T(5)) {
+    const u = smoother(t / T(5));
+    d = lerp(D_START, D_WALL, u);
+    x = PAN > 0 ? lerp(-PAN, PAN, smooth(t / T(5))) : lerp(-WALL_W * 0.12, 0, u);
+    y = lerp(WALL_H * 0.1, 0, u);
+  } else if (t < T(9.5)) {
+    const u = smoother((t - T(5)) / T(4.5));
+    d = lerp(D_WALL, D_SPHERE, u);
+    x = lerp(PAN > 0 ? PAN : 0, 0, u);
+  } else if (t < T_FLY[0]) {
+    d = lerp(D_SPHERE, D_SPHERE * 0.9, smooth((t - T(9.5)) / T(12)));
+  } else {
+    const u = smoother((t - T_FLY[0]) / (T_FLY[1] - T_FLY[0]));
+    d = lerp(D_SPHERE * 0.9, D_FILL, u);
+  }
+  camera.position.set(x, y, RC + d);
+  camera.lookAt(x * 0.6, y * 0.6, 0);
+  endMat.opacity = smooth((t - (T_FLY[1] - T(0.5))) / T(0.6));
+  const zoom = 1 + 0.03 * smooth((t - T_FLY[1]) / Math.max(0.1, cfg.duration - T_FLY[1]));
+  endPlane.scale.set(2 * TV * ASPECT * zoom, 2 * TV * zoom, 1);
+}
+
+// Supersampling: in doppelter Auflösung rendern, sauber auf Zielgröße verkleinern
+const out = document.createElement('canvas');
+out.width = W; out.height = H;
+const ctx = out.getContext('2d');
+ctx.imageSmoothingEnabled = true;
+ctx.imageSmoothingQuality = 'high';
+
+window.renderAt = t => { layout(t); cameraAt(t); renderer.render(scene, camera); };
+window.frameJPEG = t => {
+  window.renderAt(t);
+  ctx.drawImage(renderer.domElement, 0, 0, W, H);
+  return out.toDataURL('image/jpeg', 0.96);
+};
+await Promise.all(Object.values(texCache));
+window.ready = true;
+</script>
+</body></html>
