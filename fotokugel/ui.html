@@ -2,8 +2,16 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Fotokugel</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fotokugel">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#141518">
 <style>
 /* Layout: links die Fotowand (Arbeitsfläche), rechts eine feste Steuerleiste mit Einstellungen, Start und Ergebnis */
 :root {
@@ -31,6 +39,7 @@ html, body { margin: 0; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font); }
 button, input, select { font: inherit; color: inherit; }
 header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 24px;
+             padding-top: max(14px, env(safe-area-inset-top));
              border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: .01em; }
 .brand .ball { width: 22px; height: 22px; border-radius: 50%;
@@ -40,7 +49,13 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; padding: 24px; align-items: start; }
 .qrbox { padding: 22px; background: var(--panel); color: var(--ink); border-radius: 12px; display: grid; gap: 14px;
          justify-items: center; max-width: 360px; text-align: center; }
-.qrbox #qr { background: #fff; padding: 12px; border-radius: 8px; }
+.qrbox .qr { background: #fff; padding: 10px; border-radius: 8px; line-height: 0; }
+.qrs { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.qrs figure { margin: 0; display: grid; gap: 6px; justify-items: center; max-width: 220px; }
+.qrs figcaption { font-size: 13px; font-weight: 600; }
+.qrs figcaption small { display: block; font-weight: 400; color: var(--muted); }
+.banner { margin: 0 24px; margin-top: 16px; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+          border: 1px solid var(--line); font-size: 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .qrbox code { font: 12px var(--mono); word-break: break-all; color: var(--muted); }
 .ios-hint { font-size: 13px; color: var(--muted); margin: 0; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
@@ -138,8 +153,11 @@ dialog::backdrop { background: rgba(0,0,0,.8); }
   <div class="actions">
     <button class="btn small" id="phoneBtn" type="button" hidden>Am iPhone öffnen</button>
     <button class="btn small" id="newProject" type="button">Neues Projekt</button>
+    <button class="btn small danger" id="quitBtn" type="button" hidden>Beenden</button>
   </div>
 </header>
+<div class="banner" id="a2hs" hidden><span>Tipp: Über <b>Teilen</b> → <b>Zum Home-Bildschirm</b> wird die Fotokugel zur App auf dem iPhone.</span>
+  <button class="btn small" type="button" onclick="this.parentElement.hidden=true;try{localStorage.setItem('fk-a2hs','1')}catch(e){}">OK</button></div>
 
 <main>
   <section class="card photos" aria-labelledby="photosTitle">
@@ -243,10 +261,13 @@ dialog::backdrop { background: rgba(0,0,0,.8); }
 <dialog id="zoom"><img alt="Standbild groß"></dialog>
 <dialog id="phone"><div class="qrbox">
   <h2 style="margin:0">Am iPhone öffnen</h2>
-  <div id="qr"></div>
-  <p class="hint">iPhone und Mac müssen im selben WLAN sein. QR-Code mit der Kamera scannen.
-    Der Mac muss eingeschaltet bleiben, er rechnet das Video.</p>
-  <code id="lanUrl"></code>
+  <div class="qrs">
+    <figure id="qrHome"><div class="qr"></div><figcaption>Zuhause<small>iPhone im selben WLAN</small></figcaption></figure>
+    <figure id="qrAway" hidden><div class="qr"></div><figcaption>Unterwegs<small>über Tailscale</small></figcaption></figure>
+  </div>
+  <p class="hint">QR-Code mit der iPhone-Kamera scannen. Danach in Safari über <b>Teilen</b> → <b>Zum Home-Bildschirm</b>
+    als App ablegen. Der Mac muss eingeschaltet bleiben, er rechnet das Video.</p>
+  <p class="hint" id="noAway">Für unterwegs: Tailscale auf Mac und iPhone installieren und mit demselben Konto anmelden. Dann erscheint hier ein zweiter QR-Code.</p>
   <button class="btn small" type="button" onclick="this.closest('dialog').close()">Schließen</button>
 </div></dialog>
 <script src="/lib/qrcode.js"></script>
@@ -438,22 +459,37 @@ if (isTouch) {
   $('#endHint').innerHTML = 'Tippe auf ein Foto, um es als <b>Endbild</b> festzulegen. Darauf zoomt die Kamera am Schluss.';
 }
 if (isIOS) $('#iosHint').hidden = false;
+function drawQr(fig, url) {
+  const box = fig.querySelector('.qr');
+  if (window.qrcode) {
+    const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+    box.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+    box.firstElementChild.setAttribute('width', 200); box.firstElementChild.setAttribute('height', 200);
+  } else box.textContent = url;
+  fig.title = url;
+}
 api('/api/info').then(info => {
-  if (!info.lanUrl) return;
+  if (!info.lokal) return;
+  $('#quitBtn').hidden = false;
+  if (!info.lanUrl && !info.unterwegsUrl) return;
   $('#phoneBtn').hidden = false;
-  $('#lanUrl').textContent = info.lanUrl;
-  $('#phoneBtn').addEventListener('click', () => {
-    const box = $('#qr');
-    if (!box.hasChildNodes()) {
-      if (window.qrcode) {
-        const qr = qrcode(0, 'M'); qr.addData(info.lanUrl); qr.make();
-        box.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
-        box.firstElementChild.setAttribute('width', 220); box.firstElementChild.setAttribute('height', 220);
-      } else box.textContent = 'Link unten am iPhone in Safari eingeben.';
-    }
+  $('#phoneBtn').addEventListener('click', async () => {
+    const fresh = await api('/api/info').catch(() => info);     // Tailscale kann inzwischen verbunden sein
+    $('#qrHome').hidden = !fresh.lanUrl; if (fresh.lanUrl) drawQr($('#qrHome'), fresh.lanUrl);
+    $('#qrAway').hidden = !fresh.unterwegsUrl; $('#noAway').hidden = !!fresh.unterwegsUrl;
+    if (fresh.unterwegsUrl) drawQr($('#qrAway'), fresh.unterwegsUrl);
     $('#phone').showModal();
   });
 }).catch(() => {});
+$('#quitBtn').addEventListener('click', async () => {
+  const st = await api('/api/status?id=' + state.id).catch(() => ({}));
+  if (st.laeuft && !window.__quitArmed) { window.__quitArmed = true; toast('Es läuft noch ein Video. Zum Beenden nochmal klicken.'); return; }
+  await post('/api/beenden', {}).catch(() => {});
+  document.body.innerHTML = '<p style="padding:40px;font:17px -apple-system,sans-serif">Fotokugel ist beendet. Du kannst das Fenster schließen.</p>';
+});
+const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+let a2hsSeen = false; try { a2hsSeen = !!localStorage.getItem('fk-a2hs'); } catch (e) {}
+if (isIOS && !standalone && !a2hsSeen) $('#a2hs').hidden = false;
 
 init().catch(e => toast(e.message));
 </script>

@@ -36,8 +36,24 @@ PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff
 AUDIO_EXTS = {".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac"}
 JOBS = {}            # projekt-id -> {"proc", "log", "mode", "started", "done", "ok", "out"}
 LOCK = threading.Lock()
-TOKEN = secrets.token_urlsafe(9)      # geheimer Schlüssel für Zugriffe aus dem WLAN
-LAN_URL = None
+KEY_FILE = HERE / ".schluessel"
+
+
+def load_token():
+    """Geheimer Schlüssel für Zugriffe vom iPhone. Bleibt gleich, damit die Home-Bildschirm-App weiter funktioniert."""
+    try:
+        t = KEY_FILE.read_text().strip()
+        if len(t) >= 12:
+            return t
+    except OSError:
+        pass
+    t = secrets.token_urlsafe(12)
+    KEY_FILE.write_text(t)
+    return t
+
+
+TOKEN = load_token()
+HTTPD = None
 
 
 def safe_name(name):
@@ -174,9 +190,9 @@ class Handler(SimpleHTTPRequestHandler):
     def is_local(self):
         return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 
-    def authorized(self, q):
+    def authorized(self, q, path=""):
         """Vom Rechner selbst immer, aus dem WLAN nur mit dem Schlüssel aus dem QR-Code."""
-        if self.is_local():
+        if self.is_local() or path.startswith("/icons/"):
             return True
         cookie = self.headers.get("Cookie", "")
         return f"fk={TOKEN}" in cookie or q.get("k") == TOKEN
@@ -196,13 +212,21 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
-        if not self.authorized(q):
+        if not self.authorized(q, u.path):
             return self.deny()
         try:
+            if u.path.startswith("/icons/") and re.fullmatch(r"/icons/[\w-]+\.png", u.path):
+                return self.send_file(HERE / u.path.lstrip("/"), "image/png")
+            if u.path == "/manifest.webmanifest":
+                return self.send_json({
+                    "name": "Fotokugel", "short_name": "Fotokugel", "display": "standalone",
+                    "start_url": f"/?k={TOKEN}", "scope": "/", "background_color": "#141518", "theme_color": "#141518",
+                    "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                              {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png"}]})
             if u.path in ("/", "/index.html"):
                 if q.get("k") == TOKEN:                     # Schlüssel als Cookie merken, sauberer Link
                     self.send_response(303)
-                    self.send_header("Set-Cookie", f"fk={TOKEN}; Path=/; Max-Age=2592000; SameSite=Strict")
+                    self.send_header("Set-Cookie", f"fk={TOKEN}; Path=/; Max-Age=31536000; SameSite=Strict")
                     self.send_header("Location", "/")
                     self.end_headers()
                     return
@@ -210,7 +234,11 @@ class Handler(SimpleHTTPRequestHandler):
             if u.path == "/lib/qrcode.js":
                 return self.send_file(HERE / "node_modules" / "qrcode-generator" / "qrcode.js", "text/javascript")
             if u.path == "/api/info":
-                return self.send_json({"lanUrl": LAN_URL if self.is_local() else None, "lokal": self.is_local()})
+                if not self.is_local():
+                    return self.send_json({"lokal": False})
+                lan, ts = (None, None) if NUR_LOKAL else (lan_ip(), tailscale_ip())
+                link = lambda ip: f"http://{ip}:{PORT}/?{urlencode({'k': TOKEN})}" if ip else None
+                return self.send_json({"lokal": True, "lanUrl": link(lan), "unterwegsUrl": link(ts)})
             if u.path == "/api/projekt":
                 d = project_dir(q.get("id"))
                 s = load_settings(d)
@@ -307,6 +335,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"ok": True})
             if u.path == "/api/start":
                 return self.start(body)
+            if u.path == "/api/beenden":
+                if not self.is_local():
+                    return self.send_json({"fehler": "Nur am Mac möglich"}, 403)
+                threading.Timer(0.3, HTTPD.shutdown).start()
+                return self.send_json({"ok": True})
             if u.path == "/api/abbrechen":
                 job = JOBS.get(body.get("id"))
                 if job and not job["done"]:
@@ -370,31 +403,68 @@ def lan_ip():
         return None
 
 
+TS_RANGE = re.compile(r"\b(100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})\b")
+
+
+def tailscale_ip():
+    """Adresse im Tailscale-Netz (100.64.0.0/10), falls Tailscale läuft."""
+    for cli in ("tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale"):
+        exe = shutil.which(cli) or (cli if os.path.exists(cli) else None)
+        if exe:
+            try:
+                out = subprocess.run([exe, "ip", "-4"], capture_output=True, text=True, timeout=3).stdout
+                if m := TS_RANGE.search(out):
+                    return m.group(1)
+            except (OSError, subprocess.SubprocessError):
+                pass
+    try:
+        out = subprocess.run(["ifconfig"], capture_output=True, text=True, timeout=3).stdout
+        if m := TS_RANGE.search(out):
+            return m.group(1)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+NUR_LOKAL = False
+
+
 def main():
-    global LAN_URL
+    global HTTPD, NUR_LOKAL
     ap = argparse.ArgumentParser()
     ap.add_argument("--nur-lokal", action="store_true", help="nicht im WLAN freigeben")
+    ap.add_argument("--wach", action="store_true", help="Mac nicht einschlafen lassen, solange die Fotokugel läuft")
     args = ap.parse_args()
+    NUR_LOKAL = args.nur_lokal
+    if args.wach and sys.platform == "darwin" and shutil.which("caffeinate"):
+        subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())])
     PROJECTS.mkdir(exist_ok=True)
     missing = [n for n in ("ffmpeg", "node") if not shutil.which(n)]
     if missing:
         print("Achtung, nicht gefunden:", ", ".join(missing), "(siehe README)")
     if not (HERE / "node_modules" / "three").exists():
         print("Achtung: im Ordner fotokugel einmal  npm install  ausführen")
-    httpd = ThreadingHTTPServer(("127.0.0.1" if args.nur_lokal else "0.0.0.0", PORT), Handler)
+    httpd = HTTPD = ThreadingHTTPServer(("127.0.0.1" if args.nur_lokal else "0.0.0.0", PORT), Handler)
     url = f"http://127.0.0.1:{PORT}/"
     print(f"Fotokugel läuft auf {url}  (Beenden mit Strg+C)")
-    ip = None if args.nur_lokal else lan_ip()
-    if ip:
-        LAN_URL = f"http://{ip}:{PORT}/?{urlencode({'k': TOKEN})}"
-        print(f"Am iPhone (gleiches WLAN): {LAN_URL}")
-        print("  oder einfach den QR-Code in der Oberfläche scannen.")
+    if not args.nur_lokal:
+        for label, ip in (("Am iPhone im WLAN", lan_ip()), ("Unterwegs über Tailscale", tailscale_ip())):
+            if ip:
+                print(f"{label}: http://{ip}:{PORT}/?{urlencode({'k': TOKEN})}")
+        print("  oder einfach den QR-Code in der Oberfläche scannen (Knopf „Am iPhone öffnen“).")
     if not os.environ.get("FOTOKUGEL_KEIN_BROWSER"):
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\nBeendet.")
+        pass
+    for job in JOBS.values():                              # laufende Renderjobs mit beenden
+        if not job["done"] and os.name != "nt":
+            try:
+                os.killpg(job["proc"].pid, signal.SIGTERM)
+            except OSError:
+                pass
+    print("\nBeendet.")
 
 
 if __name__ == "__main__":

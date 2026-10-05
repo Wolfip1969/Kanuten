@@ -32,9 +32,33 @@ pip3 install pillow numpy "opencv-python-headless<5"
 
 `opencv` ist optional. Damit werden die Kacheln so zugeschnitten, dass das Gesicht drin ist. Für iPhone-HEIC-Fotos zusätzlich `pip install pillow-heif`.
 
-## Weboberfläche (empfohlen)
+## Als App auf dem Mac
 
-Doppelklick auf **`Fotokugel starten.command`** (Mac) oder **`Fotokugel starten.bat`** (Windows). Alternativ im Terminal `python app.py` starten. Der Browser öffnet sich dann mit `http://127.0.0.1:8777`.
+Einmal **`Mac-App erstellen.command`** doppelklicken. Danach liegt **Fotokugel.app** in deinem Programme-Ordner (`~/Programme`), mit eigenem Symbol. Zieh sie ins Dock.
+
+Ein Klick auf die App startet die Fotokugel im Hintergrund und öffnet die Oberfläche. Solange sie läuft, schläft der Mac nicht ein. Beenden kannst du sie über den Knopf **Beenden** oben rechts in der Oberfläche.
+
+Falls macOS beim ersten Öffnen warnt („nicht verifizierter Entwickler“): Rechtsklick auf die App → **Öffnen** → **Öffnen**.
+
+## Als App auf dem iPhone
+
+Seite wie unten beschrieben per QR-Code öffnen, dann in Safari **Teilen** → **Zum Home-Bildschirm**. Die Fotokugel erscheint als App-Symbol und öffnet sich ohne Browserleiste.
+
+## Unterwegs nutzen (Tailscale)
+
+Damit das iPhone den Mac auch außerhalb des WLANs erreicht, ohne dass der Mac im offenen Internet steht:
+
+1. **Tailscale** kostenlos installieren, auf dem Mac aus dem App Store und auf dem iPhone ebenfalls aus dem App Store.
+2. Auf beiden Geräten mit **demselben Konto** anmelden, zum Beispiel deinem Google- oder Apple-Konto.
+3. In der Fotokugel am Mac auf **Am iPhone öffnen** klicken. Neben „Zuhause“ erscheint jetzt ein zweiter QR-Code **Unterwegs**. Den einmal scannen und als App auf den Home-Bildschirm legen.
+
+Unterwegs muss am iPhone Tailscale eingeschaltet sein (VPN-Symbol oben). Der Mac muss eingeschaltet, wach und mit dem Internet verbunden sein. Zugeklappt im Akkubetrieb schläft er trotzdem ein. Am Netzteil hilft: Systemeinstellungen → Batterie → Optionen → „Automatischen Ruhezustand bei ausgeschaltetem Display verhindern“.
+
+Tailscale verbindet nur deine eigenen Geräte untereinander. Zusätzlich schützt der geheime Schlüssel im QR-Code-Link.
+
+## Weboberfläche
+
+Über die **Fotokugel.app** (siehe oben), per Doppelklick auf **`Fotokugel starten.command`** (Mac) oder **`Fotokugel starten.bat`** (Windows). Alternativ im Terminal `python app.py` starten. Der Browser öffnet sich dann mit `http://127.0.0.1:8777`.
 
 1. **Fotos** ins Fenster ziehen. Ein Klick auf ein Foto macht es zum Endbild (goldener Rahmen).
 2. **Format, Länge und Musik** wählen. Mit dem Player findest du die passende Stelle im Song. „Aktuelle Stelle übernehmen“ setzt dort den Startpunkt.
@@ -57,7 +81,7 @@ Beim ersten Start fragt macOS eventuell, ob Python eingehende Verbindungen anneh
 
 Musik am iPhone: Wählbar sind nur Dateien aus der App Dateien, zum Beispiel heruntergeladene MP3s. Songs aus Apple Music gehen nicht.
 
-**Sicherheit:** Der Link im QR-Code enthält einen geheimen Schlüssel, der sich bei jedem Start ändert. Ohne ihn bekommt niemand im WLAN Zugriff. Hochgeladen wird nur auf deinen Mac, nichts ins Internet. Mit `python app.py --nur-lokal` ist die Oberfläche nur am Mac selbst erreichbar.
+**Sicherheit:** Der Link im QR-Code enthält einen geheimen Schlüssel. Ohne ihn bekommt niemand im WLAN Zugriff. Der Schlüssel steht in der Datei `.schluessel`. Wer sie löscht, bekommt beim nächsten Start einen neuen, dann müssen alle iPhones den QR-Code neu scannen. Hochgeladen wird nur auf deinen Mac, nichts ins Internet. Mit `python app.py --nur-lokal` ist die Oberfläche nur am Mac selbst erreichbar.
 
 ## Benutzen im Terminal
 
@@ -107,8 +131,23 @@ Ein Reel mit 25 Sekunden braucht auf einem normalen Rechner etwa 5 bis 15 Minute
 ## Dateien
 
 - `app.py` und `ui.html`: die Weboberfläche
+- `Mac-App erstellen.command`: baut die Fotokugel.app
+- `icons/`: App-Symbole
 - `fotokugel.py`: liest die Fotos, schneidet die Kacheln zu, verteilt sie und startet das Rendern
 - `scene.html`: die 3D-Szene (three.js)
 - `render.js`: rendert die Szene Bild für Bild im Browser und gibt die Bilder direkt an ffmpeg
 - `.arbeit/`: Zwischendateien, kann gelöscht werden
 - `projekte/`: Projekte der Weboberfläche (Fotos, Musik, Videos)
+
+## Probleme lösen
+
+**„Executable doesn't exist … headless_shell“** oder `npx playwright install` hängt beim Entpacken: Chromium von Hand nachladen.
+
+```bash
+cd ~/Library/Caches/ms-playwright && rm -rf chromium_headless_shell-1194 && mkdir chromium_headless_shell-1194 && cd chromium_headless_shell-1194
+curl -L -o hs.zip https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/1194/chromium-headless-shell-mac-arm64.zip && unzip -q hs.zip && rm hs.zip
+```
+
+**iPhone erreicht den Mac nicht:** Prüfen, ob beide im selben WLAN sind und ob macOS die eingehenden Verbindungen für Python erlaubt (Systemeinstellungen → Netzwerk → Firewall → Optionen).
+
+**Protokoll der Mac-App:** `/tmp/fotokugel.log`
