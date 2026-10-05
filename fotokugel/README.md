@@ -30,7 +30,20 @@ pip install pillow numpy "opencv-python-headless<5"
 
 `opencv` ist optional. Damit werden die Kacheln so zugeschnitten, dass das Gesicht drin ist. Für iPhone-HEIC-Fotos zusätzlich `pip install pillow-heif`.
 
-## Benutzen
+## Weboberfläche (empfohlen)
+
+Doppelklick auf **`Fotokugel starten.command`** (Mac) oder **`Fotokugel starten.bat`** (Windows). Alternativ im Terminal `python app.py` starten. Der Browser öffnet sich dann mit `http://127.0.0.1:8777`.
+
+1. **Fotos** ins Fenster ziehen. Ein Klick auf ein Foto macht es zum Endbild (goldener Rahmen).
+2. **Format, Länge und Musik** wählen. Mit dem Player findest du die passende Stelle im Song. „Aktuelle Stelle übernehmen“ setzt dort den Startpunkt.
+3. **Vorschau** erzeugt in Sekunden 5 Standbilder. **Video erstellen** rendert das fertige Video mit Fortschrittsanzeige.
+4. **Video herunterladen**.
+
+Fotos, Musik und Ergebnisse liegen im Unterordner `projekte/` und bleiben auch nach einem Neustart erhalten. Mit „Neues Projekt“ beginnst du von vorn.
+
+Die Oberfläche läuft nur auf deinem Rechner (`127.0.0.1`). Nichts wird ins Internet hochgeladen.
+
+## Benutzen im Terminal
 
 ```bash
 python fotokugel.py <Fotoordner> --ende <Dateiname> --format reel --musik <song.mp3>
@@ -77,7 +90,9 @@ Ein Reel mit 25 Sekunden braucht auf einem normalen Rechner etwa 5 bis 15 Minute
 
 ## Dateien
 
+- `app.py` und `ui.html`: die Weboberfläche
 - `fotokugel.py`: liest die Fotos, schneidet die Kacheln zu, verteilt sie und startet das Rendern
 - `scene.html`: die 3D-Szene (three.js)
 - `render.js`: rendert die Szene Bild für Bild im Browser und gibt die Bilder direkt an ffmpeg
 - `.arbeit/`: Zwischendateien, kann gelöscht werden
+- `projekte/`: Projekte der Weboberfläche (Fotos, Musik, Videos)

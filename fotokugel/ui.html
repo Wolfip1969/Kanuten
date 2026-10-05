@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fotokugel</title>
+<style>
+/* Layout: links die Fotowand (Arbeitsfläche), rechts eine feste Steuerleiste mit Einstellungen, Start und Ergebnis */
+:root {
+  --bg: #f3f2ef;
+  --panel: #ffffff;
+  --ink: #1b1c1f;
+  --muted: #6c6d72;
+  --line: #e1dfda;
+  --accent: #2f6fb5;
+  --accent-ink: #ffffff;
+  --gold: #e3a21a;
+  --danger: #c2412d;
+  --ok: #2e8b57;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #141518; --panel: #1d1f23; --ink: #ecebe8; --muted: #9a9ba0; --line: #2c2e33;
+          --accent: #5b9be0; --accent-ink: #0d1117; --gold: #f0b43a; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font); }
+button, input, select { font: inherit; color: inherit; }
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 24px;
+             border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: .01em; }
+.brand .ball { width: 22px; height: 22px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0 12%, transparent 13%),
+              repeating-conic-gradient(var(--accent) 0 12deg, #9cc3ea 12deg 24deg); }
+.top .actions { display: flex; gap: 8px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; padding: 24px; align-items: start; }
+@media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+
+/* Fotos */
+.photos { padding: 20px; min-height: 60vh; display: grid; gap: 16px; align-content: start; }
+.photos-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.photos-head h2 { margin: 0; }
+.count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 28px 16px; text-align: center; color: var(--muted);
+        cursor: pointer; transition: border-color .15s, background .15s; }
+.drop strong { color: var(--ink); display: block; font-size: 17px; margin-bottom: 4px; }
+.drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.tile { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--line); cursor: pointer;
+        border: 3px solid transparent; padding: 0; }
+.tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile.end { border-color: var(--gold); }
+.tile .badge { position: absolute; left: 6px; top: 6px; background: var(--gold); color: #1b1c1f; font-size: 11px; font-weight: 700;
+               padding: 2px 7px; border-radius: 999px; display: none; }
+.tile.end .badge { display: block; }
+.tile .del { position: absolute; right: 6px; top: 6px; width: 26px; height: 26px; border-radius: 50%; border: 0;
+             background: rgba(0,0,0,.55); color: #fff; cursor: pointer; opacity: 0; transition: opacity .15s; line-height: 26px; }
+.tile:hover .del, .tile:focus-within .del { opacity: 1; }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+.uploadbar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.uploadbar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+/* Steuerleiste */
+aside { display: grid; gap: 16px; position: sticky; top: 76px; }
+.section { padding: 18px; display: grid; gap: 14px; }
+.field { display: grid; gap: 6px; }
+.field > label, .field > .lbl { font-weight: 600; font-size: 14px; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 8px 4px; cursor: pointer; display: grid; gap: 4px; justify-items: center;
+              font-size: 12px; color: var(--muted); border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button .shape { border: 2px solid currentColor; border-radius: 2px; }
+.seg button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-weight: 600; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row > * { min-width: 0; }
+input[type=number], select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+input[type=number] { width: 90px; font-variant-numeric: tabular-nums; }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; font-size: 14px; }
+.switch span { display: grid; }
+.switch small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
+.switch input { width: 40px; height: 22px; accent-color: var(--accent); }
+audio { width: 100%; height: 36px; }
+.music-file { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.music-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+details[open] summary { margin-bottom: 12px; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 9px 14px; cursor: pointer; font-weight: 600; }
+.btn:hover { border-color: var(--muted); }
+.btn { text-decoration: none; text-align: center; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.danger { color: var(--danger); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.go { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+
+/* Fortschritt und Ergebnis */
+.progress { display: grid; gap: 8px; }
+.bar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+.status { display: flex; justify-content: space-between; font-size: 14px; font-variant-numeric: tabular-nums; }
+.status .err { color: var(--danger); }
+pre.log { font: 11px/1.4 var(--mono); max-height: 140px; overflow: auto; background: var(--bg); padding: 8px; border-radius: 6px;
+          white-space: pre-wrap; margin: 0; }
+.stills { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.stills img { width: 100%; border-radius: 4px; display: block; background: #000; cursor: zoom-in; }
+.result video { width: 100%; border-radius: 8px; background: #000; display: block; max-height: 60vh; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+         padding: 10px 16px; border-radius: 8px; font-size: 14px; z-index: 20; }
+dialog { border: 0; padding: 0; background: transparent; max-width: 92vw; }
+dialog img { max-width: 92vw; max-height: 88vh; display: block; border-radius: 8px; }
+dialog::backdrop { background: rgba(0,0,0,.8); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="ball" aria-hidden="true"></span>Fotokugel</div>
+  <div class="actions">
+    <button class="btn small" id="newProject" type="button">Neues Projekt</button>
+  </div>
+</header>
+
+<main>
+  <section class="card photos" aria-labelledby="photosTitle">
+    <div class="photos-head">
+      <h2 id="photosTitle">1 · Fotos</h2>
+      <span class="count" id="count">0 Fotos</span>
+    </div>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Fotos hinzufügen">
+      <strong>Fotos hierher ziehen</strong>
+      oder klicken zum Auswählen · JPG, PNG, HEIC
+      <input type="file" id="fileInput" accept="image/*,.heic,.heif" multiple hidden>
+    </div>
+    <div class="uploadbar" id="uploadbar" hidden><i></i></div>
+    <p class="hint" id="endHint">Klicke auf ein Foto, um es als <b>Endbild</b> festzulegen. Auf dieses Bild zoomt die Kamera am Schluss.</p>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <aside>
+    <section class="card section" aria-labelledby="setTitle">
+      <h2 id="setTitle">2 · Einstellungen</h2>
+      <div class="field">
+        <span class="lbl">Format</span>
+        <div class="seg" id="formatSeg" role="group" aria-label="Format">
+          <button type="button" data-v="reel"><span class="shape" style="width:12px;height:21px"></span>Reel 9:16</button>
+          <button type="button" data-v="hochformat"><span class="shape" style="width:16px;height:20px"></span>Feed 4:5</button>
+          <button type="button" data-v="quadrat"><span class="shape" style="width:19px;height:19px"></span>Quadrat</button>
+          <button type="button" data-v="quer"><span class="shape" style="width:24px;height:14px"></span>Quer 16:9</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="dauer">Länge</label>
+        <div class="row"><input type="number" id="dauer" min="10" max="90" step="1" value="25"> Sekunden</div>
+      </div>
+      <div class="field">
+        <span class="lbl">Musik <span class="hint">(optional)</span></span>
+        <div id="musicEmpty"><button class="btn small" type="button" id="musicPick">Musik wählen …</button>
+          <input type="file" id="musicInput" accept="audio/*,.mp3,.m4a,.wav" hidden></div>
+        <div id="musicSet" hidden>
+          <div class="music-file"><span id="musicName"></span><button class="btn small danger" type="button" id="musicDel">Entfernen</button></div>
+          <audio id="audio" controls preload="metadata"></audio>
+          <div class="row">
+            <label for="musikStart">Start bei</label>
+            <input type="number" id="musikStart" min="0" step="0.1" value="0"> s
+            <button class="btn small" type="button" id="takePos">Aktuelle Stelle übernehmen</button>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Weitere Optionen</summary>
+        <div class="section" style="padding:0">
+          <label class="switch"><span>Schwarz-Weiß-Schachbrett<small>mit Farb-Wellen über die Kugel</small></span><input type="checkbox" id="sw"></label>
+          <div class="field">
+            <label for="endeBild">Endbild</label>
+            <select id="endeBild"><option value="ganz">Ganzes Foto, unscharfer Rand</option><option value="fuellen">Bildfüllend zuschneiden</option></select>
+          </div>
+          <div class="field">
+            <label for="fugen">Fugen auf der Kugel</label>
+            <select id="fugen"><option value="weiss">Weiß</option><option value="grau">Grau</option><option value="schwarz">Schwarz</option></select>
+          </div>
+          <div class="field">
+            <label for="fps">Bildrate</label>
+            <select id="fps"><option value="30">30 Bilder/s</option><option value="60">60 Bilder/s (doppelte Renderzeit)</option></select>
+          </div>
+          <div class="field">
+            <label for="qualitaet">Qualität</label>
+            <select id="qualitaet"><option value="max">Maximal für Instagram</option><option value="vorschau">Schnell (zum Ausprobieren)</option></select>
+          </div>
+          <div class="field">
+            <label for="seed">Verteilung</label>
+            <div class="row"><input type="number" id="seed" min="1" step="1" value="7"><span class="hint">andere Zahl = Fotos anders gemischt</span></div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <section class="card section" aria-labelledby="goTitle">
+      <h2 id="goTitle">3 · Erstellen</h2>
+      <div class="go">
+        <button class="btn" type="button" id="btnStills">Vorschau</button>
+        <button class="btn primary" type="button" id="btnVideo">Video erstellen</button>
+      </div>
+      <p class="hint" id="goHint">Vorschau zeigt 5 Standbilder in wenigen Sekunden. Das Video braucht einige Minuten.</p>
+      <div class="progress" id="progress" hidden>
+        <div class="bar"><i id="barFill"></i></div>
+        <div class="status"><span id="stage"></span><span id="pct"></span></div>
+        <button class="btn small danger" type="button" id="btnCancel">Abbrechen</button>
+        <details><summary>Protokoll</summary><pre class="log" id="log"></pre></details>
+      </div>
+    </section>
+
+    <section class="card section result" id="resultCard" hidden aria-labelledby="resTitle">
+      <h2 id="resTitle">Ergebnis</h2>
+      <div class="stills" id="stills"></div>
+      <video id="video" controls playsinline hidden></video>
+      <a class="btn primary" id="download" hidden download>Video herunterladen</a>
+    </section>
+  </aside>
+</main>
+<dialog id="zoom"><img alt="Standbild groß"></dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const state = { id: null, fotos: [], musik: null, s: {} };
+const DEFAULTS = { format: 'reel', dauer: 25, musikStart: 0, sw: false, endeBild: 'ganz', fugen: 'weiss', fps: 30, qualitaet: 'max', seed: 7, ende: null };
+
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 3500);
+}
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.fehler || 'Fehler ' + r.status);
+  return j;
+}
+const post = (path, body) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+// ---------- Projekt ----------
+async function newProject() {
+  const { id } = await api('/api/neu', { method: 'POST' });
+  try { localStorage.setItem('fotokugel-projekt', id); } catch (e) {}
+  return id;
+}
+async function loadProject() {
+  const p = await api('/api/projekt?id=' + state.id);
+  state.fotos = p.fotos; state.musik = p.musik;
+  state.s = Object.assign({}, DEFAULTS, p.einstellungen || {});
+  if (!state.s.ende || !state.fotos.includes(state.s.ende)) state.s.ende = state.fotos[0] || null;
+  renderSettings(); renderPhotos(); renderMusic(); renderResult(p.ergebnis);
+  const st = await api('/api/status?id=' + state.id);
+  if (st.laeuft) poll();
+}
+async function init() {
+  let id = null;
+  try { id = localStorage.getItem('fotokugel-projekt'); } catch (e) {}
+  state.id = id;
+  try { await loadProject(); } catch (e) { state.id = await newProject(); await loadProject(); }
+}
+
+// ---------- Fotos ----------
+function renderPhotos() {
+  $('#count').textContent = state.fotos.length === 1 ? '1 Foto' : state.fotos.length + ' Fotos';
+  const g = $('#grid'); g.innerHTML = '';
+  for (const name of state.fotos) {
+    const b = document.createElement('div');
+    b.className = 'tile' + (name === state.s.ende ? ' end' : '');
+    b.tabIndex = 0; b.setAttribute('role', 'button');
+    b.setAttribute('aria-label', name + (name === state.s.ende ? ' (Endbild)' : ', als Endbild wählen'));
+    b.innerHTML = `<img loading="lazy" alt=""><span class="badge">Endbild</span><button class="del" type="button" aria-label="Foto entfernen">✕</button>`;
+    b.querySelector('img').src = `/api/thumb?id=${state.id}&name=${encodeURIComponent(name)}`;
+    const pick = () => { state.s.ende = name; saveSettings(); renderPhotos(); };
+    b.addEventListener('click', e => { if (!e.target.classList.contains('del')) pick(); });
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+    b.querySelector('.del').addEventListener('click', async () => {
+      await post('/api/loeschen', { id: state.id, fotos: [name] });
+      state.fotos = state.fotos.filter(n => n !== name);
+      if (state.s.ende === name) { state.s.ende = state.fotos[0] || null; saveSettings(); }
+      renderPhotos();
+    });
+    g.appendChild(b);
+  }
+}
+async function uploadFiles(files, art = 'foto') {
+  files = [...files];
+  if (!files.length) return;
+  const bar = $('#uploadbar'); bar.hidden = false;
+  let done = 0, failed = [];
+  for (const f of files) {
+    try {
+      await api(`/api/upload?id=${state.id}&art=${art}&name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f });
+    } catch (e) { failed.push(e.message); }
+    done++; bar.firstElementChild.style.width = (100 * done / files.length) + '%';
+  }
+  setTimeout(() => { bar.hidden = true; bar.firstElementChild.style.width = 0; }, 500);
+  if (failed.length) toast(failed[0] + (failed.length > 1 ? ` (+${failed.length - 1} weitere)` : ''));
+  await loadProject();
+}
+const drop = $('#drop');
+drop.addEventListener('click', () => $('#fileInput').click());
+drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#fileInput').click(); } });
+$('#fileInput').addEventListener('change', e => { uploadFiles(e.target.files); e.target.value = ''; });
+['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); if (ev === 'drop' || e.target === document.documentElement) drop.classList.remove('over'); }));
+document.addEventListener('drop', e => {
+  const files = [...e.dataTransfer.files];
+  const audio = files.filter(f => f.type.startsWith('audio/') || /\.(mp3|m4a|wav|aac)$/i.test(f.name));
+  const imgs = files.filter(f => !audio.includes(f));
+  if (imgs.length) uploadFiles(imgs);
+  if (audio.length) uploadFiles(audio.slice(0, 1), 'musik');
+});
+
+// ---------- Musik ----------
+function renderMusic() {
+  $('#musicEmpty').hidden = !!state.musik; $('#musicSet').hidden = !state.musik;
+  if (state.musik) {
+    $('#musicName').textContent = state.musik;
+    const src = `/api/datei?id=${state.id}&pfad=${encodeURIComponent(state.musik)}`;
+    if (!$('#audio').src.endsWith(src)) $('#audio').src = src;
+  }
+}
+$('#musicPick').addEventListener('click', () => $('#musicInput').click());
+$('#musicInput').addEventListener('change', e => { uploadFiles(e.target.files, 'musik'); e.target.value = ''; });
+$('#musicDel').addEventListener('click', async () => { await post('/api/loeschen', { id: state.id, musik: true }); state.musik = null; $('#audio').removeAttribute('src'); renderMusic(); });
+$('#takePos').addEventListener('click', () => { $('#musikStart').value = $('#audio').currentTime.toFixed(1); readSettings(); });
+$('#audio').addEventListener('loadedmetadata', () => { $('#audio').currentTime = state.s.musikStart || 0; });
+
+// ---------- Einstellungen ----------
+function renderSettings() {
+  for (const b of $('#formatSeg').children) b.setAttribute('aria-pressed', String(b.dataset.v === state.s.format));
+  $('#dauer').value = state.s.dauer; $('#musikStart').value = state.s.musikStart;
+  $('#sw').checked = !!state.s.sw; $('#endeBild').value = state.s.endeBild; $('#fugen').value = state.s.fugen;
+  $('#fps').value = String(state.s.fps); $('#qualitaet').value = state.s.qualitaet; $('#seed').value = state.s.seed;
+}
+function readSettings() {
+  Object.assign(state.s, {
+    dauer: Math.min(90, Math.max(10, +$('#dauer').value || 25)), musikStart: Math.max(0, +$('#musikStart').value || 0),
+    sw: $('#sw').checked, endeBild: $('#endeBild').value, fugen: $('#fugen').value,
+    fps: +$('#fps').value, qualitaet: $('#qualitaet').value, seed: Math.max(1, Math.round(+$('#seed').value || 7)),
+  });
+  saveSettings();
+}
+let saveTimer;
+function saveSettings() { clearTimeout(saveTimer); saveTimer = setTimeout(() => post('/api/einstellungen', { id: state.id, einstellungen: state.s }), 300); }
+$('#formatSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.format = b.dataset.v; renderSettings(); saveSettings(); });
+document.querySelectorAll('aside input, aside select').forEach(el => { if (el.type !== 'file') el.addEventListener('change', readSettings); });
+
+// ---------- Starten, Fortschritt, Ergebnis ----------
+async function start(modus) {
+  readSettings();
+  if (state.fotos.length < 2) return toast('Bitte zuerst mindestens 2 Fotos hinzufügen.');
+  try { await post('/api/start', { id: state.id, modus, einstellungen: state.s }); poll(); }
+  catch (e) { toast(e.message); }
+}
+let pollTimer;
+async function poll() {
+  clearTimeout(pollTimer);
+  const st = await api('/api/status?id=' + state.id).catch(() => null);
+  if (!st) return;
+  $('#progress').hidden = false;
+  $('#btnStills').disabled = $('#btnVideo').disabled = st.laeuft;
+  $('#btnCancel').hidden = !st.laeuft;
+  $('#barFill').style.width = st.prozent + '%';
+  $('#stage').innerHTML = st.fertig && !st.ok ? '<span class="err">Fehler – siehe Protokoll</span>' : st.schritt;
+  const m = Math.floor(st.sekunden / 60), s = st.sekunden % 60;
+  $('#pct').textContent = `${st.prozent} % · ${m}:${String(s).padStart(2, '0')}`;
+  $('#log').textContent = st.log;
+  if (st.laeuft) { pollTimer = setTimeout(poll, 1000); return; }
+  if (st.ok) {
+    const p = await api('/api/projekt?id=' + state.id);
+    renderResult(p.ergebnis, st.modus);
+    toast(st.modus === 'video' ? 'Video ist fertig.' : 'Vorschau ist fertig.');
+  }
+}
+function fileUrl(pfad, extra = '') { return `/api/datei?id=${state.id}&pfad=${encodeURIComponent(pfad)}${extra}`; }
+function renderResult(r, modus) {
+  if (!r || (!r.video && !r.standbilder)) { $('#resultCard').hidden = true; return; }
+  $('#resultCard').hidden = false;
+  const st = $('#stills'); st.innerHTML = '';
+  for (const p of (r.standbilder || [])) {
+    const img = document.createElement('img'); img.alt = 'Standbild'; img.src = fileUrl(p, '&t=' + r.standbilderZeit);
+    img.addEventListener('click', () => { $('#zoom img').src = img.src; $('#zoom').showModal(); });
+    st.appendChild(img);
+  }
+  st.hidden = !(r.standbilder || []).length || (modus === 'video');
+  const v = $('#video'), dl = $('#download');
+  v.hidden = dl.hidden = !r.video;
+  if (r.video) {
+    const src = fileUrl(r.video, '&t=' + r.videoZeit);
+    if (v.getAttribute('src') !== src) v.src = src;
+    dl.href = fileUrl(r.video, '&download=1'); dl.setAttribute('download', r.video.split('/').pop());
+  }
+}
+$('#zoom').addEventListener('click', () => $('#zoom').close());
+$('#btnStills').addEventListener('click', () => start('standbilder'));
+$('#btnVideo').addEventListener('click', () => start('video'));
+$('#btnCancel').addEventListener('click', () => post('/api/abbrechen', { id: state.id }));
+$('#newProject').addEventListener('click', async () => { state.id = await newProject(); await loadProject(); toast('Neues Projekt angelegt.'); });
+
+init().catch(e => toast(e.message));
+</script>
+</body>
+</html>

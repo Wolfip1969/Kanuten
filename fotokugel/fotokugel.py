@@ -5,6 +5,7 @@ Beispiel:
     python fotokugel.py ~/Bilder/Shooting --ende IMG_0412.jpg --format reel --musik song.mp3
 """
 import argparse
+import hashlib
 import http.server
 import json
 import math
@@ -197,7 +198,7 @@ def main():
         sys.exit("Abhängigkeiten fehlen. Im Ordner fotokugel einmal ausführen:  npm install")
 
     W, H = FORMATS[args.format]
-    work = HERE / ".arbeit" / src.name
+    work = HERE / ".arbeit" / f"{src.name}_{hashlib.md5(str(src).encode()).hexdigest()[:6]}"
     if work.exists():
         shutil.rmtree(work)
     (work / "tiles").mkdir(parents=True)
@@ -249,7 +250,7 @@ def main():
     (work / "job.json").write_text(json.dumps(job))
 
     httpd = serve(HERE)
-    url = f"http://127.0.0.1:{httpd.server_address[1]}/scene.html?job=/.arbeit/{src.name}/"
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/scene.html?job=/.arbeit/{work.name}/"
     mode = "stills" if args.standbilder else "video"
     print("Rendere " + ("Standbilder" if mode == "stills" else f"Video ({args.qualitaet}) ..."))
     r = subprocess.run([node, str(HERE / "render.js"), url, str(work / "job.json"), mode], cwd=HERE)
